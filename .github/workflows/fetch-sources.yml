@@ -1,0 +1,34 @@
+name: Fetch research sources
+
+# Manual job: downloads public statistics files that block Claude's workspace (e.g. Stats SA)
+# and keeps them as a downloadable artifact for 7 days. Nothing is deployed.
+on:
+  workflow_dispatch:
+    inputs:
+      urls:
+        description: "Space-separated URLs (leave empty to use research/sources.txt)"
+        required: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download
+        run: |
+          mkdir -p out
+          LIST="${{ github.event.inputs.urls }}"
+          [ -z "$LIST" ] && LIST=$(grep -v '^#' research/sources.txt)
+          for u in $LIST; do
+            f="out/$(basename "$u" | tr -c 'A-Za-z0-9._-' '_')"
+            code=$(curl -sSL -A "Mozilla/5.0 (research download for pricemoves.co.za)" -m 90 -o "$f" -w "%{http_code}" "$u" || echo ERR)
+            echo "$code $u" | tee -a out/_log.txt
+            [ "$code" = "200" ] || rm -f "$f"
+            sleep 2
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sources
+          path: out/
+          retention-days: 7
