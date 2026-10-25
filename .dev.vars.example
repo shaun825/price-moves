@@ -1,2 +1,0 @@
-# Copy to .dev.vars for local testing with `npx wrangler dev`. Never commit .dev.vars.
-AIRTABLE_TOKEN=paste-a-read-only-token-here

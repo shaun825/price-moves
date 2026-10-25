@@ -1,5 +1,5 @@
 "use strict";
-/* Price Moves front end. Loads published prices from /api/prices (falls back to /data/prices.json)
+/* Price Moves front end. Loads published prices from /data/prices.json (built daily from Airtable)
    and the long fuel history from /data/fuel-history.json. All text from the data is escaped before display. */
 
 const DAY = 864e5;
@@ -19,8 +19,7 @@ async function getJSON(url) { const r = await fetch(url, { headers: { accept: "a
 
 async function load() {
   let data;
-  try { data = await getJSON("/api/prices?v=2"); if (!data.items) throw new Error("no items"); }
-  catch { data = await getJSON("/data/prices.json"); }
+  data = await getJSON("/data/prices.json");
   let hist = { series: {}, sources: [] };
   try { hist = await getJSON("/data/fuel-history.json"); } catch { /* history is optional */ }
   const SHORT = ["Fuels Industry Association", "Stats SA"];

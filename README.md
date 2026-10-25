@@ -6,9 +6,10 @@ Public site for pricemoves.co.za. A Cloudflare Worker serves the static site in 
 
 - **Airtable** (base `appGyEcbEm92sKM9l`) holds Products and Price Observations. An observation shows on the site when its **Publish** formula is 1: it has a price, is not ticked **Rejected**, and is either ticked **Valid** or has **High** confidence.
 - **Make** runs the monthly fuel import and the monthly research run, which write new observations.
-- **The Worker** (`src/worker.js`) fetches Products where Include is ticked, plus published observations, and returns them as one JSON file. Visitors never talk to Airtable, and the Airtable token never reaches the browser.
+- **GitHub Actions** runs `scripts/build-prices.mjs` before every deploy: it reads Products where Include is ticked plus published observations from Airtable (about 6 requests) and writes `public/data/prices.json`. Deploys run on every push, daily at 05:00 SAST, and on demand. Visitors never cause Airtable requests.
+- **The Worker** (`src/worker.js`) just serves the static site.
 - **Fuel history** (`public/data/fuel-history.json`) is a static file: official monthly prices from 2012 (Fuels Industry Association of South Africa) and inland 93 petrol data points back to 1976 (Stats SA). It is kept out of Airtable to save records.
-- `public/data/prices.json` is a snapshot used only if `/api/prices` is down.
+- `public/data/prices.json` in the repo is only a local-preview copy; the deployed one is rebuilt each run.
 
 ## One-time setup
 
@@ -22,8 +23,8 @@ Deploys run from GitHub Actions (`.github/workflows/deploy.yml`) on every push t
 
 ## After each monthly run
 
-Review new observations in Airtable. Tick **Valid** on Medium or Low confidence prices that look right, or **Rejected** on ones that don't. The site picks up changes within 6 hours.
+Review new observations in Airtable. Tick **Valid** on Medium or Low confidence prices that look right, or **Rejected** on ones that don't. The site picks up changes at the next daily run (05:00), or straight away via Actions → Deploy to Cloudflare → Run workflow.
 
 ## Local preview
 
-`npx wrangler dev` with a `.dev.vars` file (see `.dev.vars.example`). Never commit `.dev.vars`.
+`AIRTABLE_TOKEN=… node scripts/build-prices.mjs` then `npx wrangler dev`. Never commit tokens.
