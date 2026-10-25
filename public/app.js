@@ -58,16 +58,30 @@ async function load() {
     const series = [...pts.values()].sort((a, b) => a.t - b.t);
     const lastT = series.length ? series[series.length - 1].t : 0;
     if (lastT > LATEST) LATEST = lastT;
-    // fees charged once a year are shown as a monthly amount (annual fee ÷ 12) so they sit alongside monthly costs
-    const annual = /^per (year|annum)$/i.test(it.unit || "");
-    if (annual) { for (const p of series) p.v /= 12; for (const o of obs) o.v /= 12; for (const p of store) p.v /= 12; }
-    return { ...it, unit: annual ? "per month" : it.unit, annual, obsList: obs.sort((a, b) => b.t - a.t), series, lastT, official, store, provData: OFF.prov[it.id] || null, statssa: OFF.items[it.id]?.statssa || "" };
+    // recurring costs (per month / per year) can be shown monthly or annualised; keep the raw value to rescale
+    const period = /^per (year|annum)$/i.test(it.unit || "") ? "year" : /^per month$/i.test(it.unit || "") ? "month" : null;
+    for (const p of [...series, ...obs, ...store]) p.raw = p.v;
+    return { ...it, baseUnit: it.unit, period, obsList: obs.sort((a, b) => b.t - a.t), series, lastT, official, store, provData: OFF.prov[it.id] || null, statssa: OFF.items[it.id]?.statssa || "" };
   }).filter((it) => it.series.length);
   BYID = Object.fromEntries(ITEMS.map((i) => [i.id, i]));
+  applyCostMode();
   CATS = [...new Set(ITEMS.map((i) => i.cat))];
   selected = BYID["ENG-002"] ? "ENG-002" : ITEMS[0]?.id;
   if (location.hash.length > 1 && BYID[decodeURIComponent(location.hash.slice(1))]) selected = decodeURIComponent(location.hash.slice(1));
   $("gen").textContent = data.generated ? "Data refreshed " + fmtDate(Date.parse(data.generated)) : "";
+}
+
+/* recurring costs: monthly or annualised */
+let costMode = "month";
+try { if (localStorage.getItem("pm-cost") === "year") costMode = "year"; } catch { /* storage unavailable */ }
+function applyCostMode() {
+  for (const it of ITEMS) {
+    if (!it.period) continue;
+    const f = it.period === costMode ? 1 : it.period === "year" ? 1 / 12 : 12;
+    for (const p of [...it.series, ...it.obsList, ...it.store]) p.v = p.raw * f;
+    it.unit = costMode === "month" ? "per month" : "per year";
+    it.converted = f !== 1;
+  }
 }
 
 /* values and changes */
@@ -176,7 +190,7 @@ function renderDetail() {
   $("d-name").textContent = it.name;
   $("d-spec").textContent = it.spec + (it.tier ? ` · ${it.tier}` : "");
   $("d-price").innerHTML = priceParts(it, last.v);
-  $("d-per").textContent = it.annual ? `per month · ${money(it, last.v * 12)} a year` : (it.unit || it.spec);
+  $("d-per").textContent = it.converted ? `${it.unit} · ${money(it, last.raw)} ${it.period === "year" ? "a year" : "a month"} as charged` : (it.unit || it.spec);
   const latestObs = it.obsList.length ? it.obsList.filter((o) => o.t >= it.obsList[0].t - 31 * DAY) : [];
   const vatTxt = latestObs.length && /excl/i.test(latestObs[0].vat) ? " · excl. VAT" : "";
   $("d-credit").textContent = it.official ? `Stats SA average · ${fmtMonth(last.t)}` : (latestObs.length > 1 && new Set(latestObs.map((o) => o.src)).size > 1 ? `Median of ${new Set(latestObs.map((o) => o.src)).size} sources · ${fmtMonth(last.t)}` : `${last.src} · ${fmtDate(last.t)}`) + vatTxt;
@@ -199,7 +213,7 @@ function renderDetail() {
   } else $("sellers").innerHTML = it.official ? "" : `<h3>Source</h3><div style="font-size:13px">${esc(last.src)} · ${esc(fmtDate(last.t))}</div>`;
   renderProvinces(it);
   $("meta").innerHTML = `<div><small>Checked</small>Monthly${it.method ? " · " + esc(it.method) : ""}</div><div><small>Comparable unit</small>${esc(it.unit || "–")}</div>` +
-    (it.annual ? `<div style="grid-column:1/-1"><small>Annual fee</small>Charged once a year at ${money(it, it.series[it.series.length - 1].v * 12)}. Shown here as a monthly amount (the annual fee divided by 12) so it compares with other monthly costs.</div>` : "") +
+    (it.period ? `<div style="grid-column:1/-1"><small>Recurring cost</small>Charged ${it.period === "year" ? "once a year" : "monthly"}${it.converted ? `; shown ${costMode === "month" ? "as a monthly amount (annual fee ÷ 12)" : "as a yearly total (monthly cost × 12)"}` : ""}. Switch between monthly and annual with “Recurring costs” at the top.</div>` : "") +
     (it.official ? `<div style="grid-column:1/-1"><small>Price history</small>Stats SA average shelf price for “${esc(it.statssa)}”, all urban areas. The headline price, changes and chart use this average; dots on the chart are our own store checks.</div>` : "");
   paintTiles();
 }
@@ -296,6 +310,7 @@ function bind() {
     const t = e.target.closest("[data-id]"); if (t) { select(t.dataset.id); return; }
     const chip = e.target.closest(".chip"); if (chip) { activeCat = chip.dataset.cat || null; renderChips(); renderMap(); return; }
     const pr = e.target.closest("#period button"); if (pr) { period = +pr.dataset.d; setPressed("#period button", pr); renderMap(); renderMovers(); renderSummary(); renderDetail(); return; }
+    const cm = e.target.closest("#costmode button"); if (cm) { costMode = cm.dataset.m; try { localStorage.setItem("pm-cost", costMode); } catch { /* ignore */ } setPressed("#costmode button", cm); applyCostMode(); renderSummary(); renderMovers(); renderFeed(); renderMap(); renderDetail(); return; }
     const dn = e.target.closest("#density button"); if (dn) { density = dn.dataset.v; setPressed("#density button", dn); renderMap(); return; }
     const hr = e.target.closest("#range button"); if (hr) { histYears = +hr.dataset.y; setPressed("#range button", hr); renderDetail(); return; }
     if (!e.target.closest("#combo")) { $("results").hidden = true; $("combo").setAttribute("aria-expanded", "false"); }
@@ -320,5 +335,6 @@ function bind() {
 $("yr").textContent = new Date().getFullYear();
 load().then(() => {
   if (!ITEMS.length) { $("map").innerHTML = `<div class="loading">No published prices yet.</div>`; $("asof").textContent = "No prices yet"; return; }
+  document.querySelectorAll("#costmode button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.m === costMode));
   bind(); renderChips(); renderSummary(); renderMovers(); renderFeed(); renderMap(); renderDetail();
 }).catch(() => { $("map").innerHTML = `<div class="loading">Prices could not be loaded. Please try again shortly.</div>`; $("asof").textContent = "Prices unavailable"; });
