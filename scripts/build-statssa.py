@@ -62,10 +62,12 @@ def month(col):  # 'M201701' -> '2017-01-15'
 
 au_path, pr_path, items_path = sys.argv[1:4]
 rows = list(load_workbook(au_path, read_only=True).worksheets[0].iter_rows(values_only=True))
-hdr = rows[0]; mcols = [i for i, h in enumerate(hdr) if str(h).startswith("M")]
+import re
+MONTH_COL = re.compile(r"^M\d{6}$")  # skips extra columns such as 'March Online Price' (2020 lockdown)
+hdr = rows[0]; mcols = [i for i, h in enumerate(hdr) if MONTH_COL.match(str(h))]
 au = {(str(r[4]), str(r[9]).strip()): r for r in rows[1:]}
 prow = list(load_workbook(pr_path, read_only=True).worksheets[0].iter_rows(values_only=True))
-phdr = prow[0]; pm = [i for i, h in enumerate(phdr) if str(h).startswith("M")]
+phdr = prow[0]; pm = [i for i, h in enumerate(phdr) if MONTH_COL.match(str(h))]
 prov = {}
 for r in prow[1:]:
     prov.setdefault((str(r[4]), str(r[9]).strip()), {})[PROV.get(str(r[10]).strip(), r[10])] = r

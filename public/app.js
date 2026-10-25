@@ -23,7 +23,7 @@ async function load() {
   // long-run history files: { short: [source label per index], series: { itemId: [[date, price, sourceIndex, label?]] } }
   // a point with a label is a sparse historical data point (drawn dashed); our own observations win for any month
   const HIST = [];
-  for (const f of ["/data/fuel-history.json", "/data/statssa-history.json"]) {
+  for (const f of ["/data/fuel-history.json", "/data/statssa-history.json", "/data/historic-prices.json"]) {
     try { const h = await getJSON(f); h.short = h.short || ["Fuels Industry Association", "Stats SA"]; HIST.push(h); } catch { /* optional */ }
   }
   // Stats SA official averages: items that have them use that series for price, change and chart, so months
@@ -190,7 +190,7 @@ function renderDetail() {
   $("d-name").textContent = it.name;
   $("d-spec").textContent = it.spec + (it.tier ? ` · ${it.tier}` : "");
   $("d-price").innerHTML = priceParts(it, last.v);
-  $("d-per").textContent = it.converted ? `${it.unit} · ${money(it, last.raw)} ${it.period === "year" ? "a year" : "a month"} as charged` : (it.unit || it.spec);
+  $("d-per").textContent = it.converted ? `${it.unit} · ${money(it, last.raw)} ${it.period === "year" ? "a year" : "a month"} as charged` : (it.spec && it.spec.length < 30 ? it.spec : it.unit || it.spec);
   const latestObs = it.obsList.length ? it.obsList.filter((o) => o.t >= it.obsList[0].t - 31 * DAY) : [];
   const vatTxt = latestObs.length && /excl/i.test(latestObs[0].vat) ? " · excl. VAT" : "";
   $("d-credit").textContent = it.official ? `Stats SA average · ${fmtMonth(last.t)}` : (latestObs.length > 1 && new Set(latestObs.map((o) => o.src)).size > 1 ? `Median of ${new Set(latestObs.map((o) => o.src)).size} sources · ${fmtMonth(last.t)}` : `${last.src} · ${fmtDate(last.t)}`) + vatTxt;
@@ -275,7 +275,7 @@ function drawChart() {
   svg.innerHTML = g;
   geom = { x, y, pts, W };
   const anyAnchor = pts.some((p) => p.anchor);
-  $("chartnote").textContent = pts.length === 1 ? `First check on ${fmtDate(lastP.t)}. The line grows with every monthly check.` : anyAnchor ? "Before 2012, open circles are individual published data points joined by a dashed line; prices between them are not shown." : "";
+  $("chartnote").textContent = pts.length === 1 ? `First check on ${fmtDate(lastP.t)}. The line grows with every monthly check.` : anyAnchor ? "Open circles are individual prices from older published reports, joined by a dashed line; prices between them were not published. Hover a circle to see its source." : "";
 }
 function chartHover(e) {
   if (!geom) return; const svg = $("chart"), rect = svg.getBoundingClientRect(), px = (e.clientX - rect.left) * (geom.W / rect.width);
