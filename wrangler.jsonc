@@ -8,8 +8,8 @@
     "binding": "ASSETS",
     "not_found_handling": "404-page"
   },
+  "workers_dev": true,
   "routes": [
-    { "pattern": "pricemoves.co.za", "custom_domain": true },
     { "pattern": "www.pricemoves.co.za", "custom_domain": true }
   ],
   "observability": { "enabled": true }
