@@ -20,9 +20,12 @@ async function getJSON(url) { const r = await fetch(url, { headers: { accept: "a
 async function load() {
   let data;
   data = await getJSON("/data/prices.json");
-  let hist = { series: {}, sources: [] };
-  try { hist = await getJSON("/data/fuel-history.json"); } catch { /* history is optional */ }
-  const SHORT = ["Fuels Industry Association", "Stats SA"];
+  // long-run history files: { short: [source label per index], series: { itemId: [[date, price, sourceIndex, label?]] } }
+  // a point with a label is a sparse historical data point (drawn dashed); our own observations win for any month
+  const HIST = [];
+  for (const f of ["/data/fuel-history.json", "/data/statssa-history.json"]) {
+    try { const h = await getJSON(f); h.short = h.short || ["Fuels Industry Association", "Stats SA"]; HIST.push(h); } catch { /* optional */ }
+  }
   const F = data.fields || ["date", "price", "source", "province", "city", "packSeen", "vat", "promotion"];
   const ix = Object.fromEntries(F.map((f, i) => [f, i]));
 
@@ -40,9 +43,9 @@ async function load() {
       pts.set(k, { t, v: median(list.map((o) => o.v)), src: srcs.length === 1 ? srcs[0] : `median of ${srcs.length} sources`, n: list.length, anchor: false });
     }
     // long history (fuel); our own observation wins for any month both cover
-    for (const [ds, v, si, label] of hist.series[it.id] || []) {
+    for (const hist of HIST) for (const [ds, v, si, label] of hist.series[it.id] || []) {
       const t = parseDate(ds), d = new Date(t), k = d.getUTCFullYear() * 12 + d.getUTCMonth();
-      if (!pts.has(k)) pts.set(k, { t, v, src: SHORT[si] || hist.sources[si] || "", n: 1, anchor: si === 1, label });
+      if (!pts.has(k)) pts.set(k, { t, v, src: hist.short[si] || hist.sources[si] || "", n: 1, anchor: !!label, label });
     }
     const series = [...pts.values()].sort((a, b) => a.t - b.t);
     const lastT = series.length ? series[series.length - 1].t : 0;
