@@ -8,8 +8,10 @@
     "binding": "ASSETS",
     "not_found_handling": "404-page"
   },
+  "routes": [
+    { "pattern": "pricemoves.co.za", "custom_domain": true },
+    { "pattern": "www.pricemoves.co.za", "custom_domain": true }
+  ],
   "observability": { "enabled": true }
-  // Once pricemoves.co.za is on Cloudflare, add this line above "observability" to attach the domain on deploy:
-  // "routes": [{ "pattern": "pricemoves.co.za", "custom_domain": true }, { "pattern": "www.pricemoves.co.za", "custom_domain": true }],
   // Secret AIRTABLE_TOKEN is set by the GitHub deploy workflow from the repo's secrets; never commit it.
 }
