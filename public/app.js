@@ -13,6 +13,7 @@ const fmtMonth = (t) => { const d = new Date(t); return `${MON[d.getUTCMonth()]}
 const median = (a) => { const s = [...a].sort((x, y) => x - y), n = s.length; return n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2; };
 
 let ITEMS = [], BYID = {}, CATS = [], LATEST = 0;
+let logScale = false;
 let period = 365, histYears = 5, selected = null, activeCat = null, query = "", density = "lab";
 
 async function getJSON(url) { const r = await fetch(url, { headers: { accept: "application/json" } }); if (!r.ok) throw new Error(url + " " + r.status); return r.json(); }
@@ -98,6 +99,7 @@ function money(it, v) {
   const u = it.unit || "";
   if (u === "% p.a." || u === "%") return v.toFixed(2) + "%";
   if (u.startsWith("USD")) return "$" + (v >= 1000 ? nf0.format(v) : v.toFixed(2));
+  if (v > 0 && v < 1) return (v * 100).toFixed(v < 0.1 ? 1 : 0) + "c"; // historic prices under a rand, shown in cents
   return "R" + (v >= 1000 ? nf0.format(v) : v.toFixed(2));
 }
 const pct = (x) => (x >= 0 ? "+" : "−") + Math.abs(x * 100).toFixed(1) + "%";
@@ -245,10 +247,22 @@ function drawChart() {
   if (pts.length === 1) { t0 = pts[0].t - 30 * DAY; t1 = pts[0].t + 30 * DAY; }
   const vals = pts.map((p) => p.v); let lo = Math.min(...vals), hi = Math.max(...vals);
   if (hi - lo < hi * 0.02) { lo *= 0.98; hi *= 1.02; }
-  const step = niceStep((hi - lo) / 4); lo = Math.max(0, Math.floor(lo / step) * step); hi = Math.ceil(hi / step) * step;
-  const x = (t) => L + (Math.max(t, t0) - t0) / (t1 - t0 || 1) * (W - L - R), y = (v) => T + (1 - (v - lo) / (hi - lo)) * (H - T - B);
+  const useLog = logScale && lo > 0 && hi / lo > 3;
+  let ticks = [];
+  if (useLog) {
+    const a = Math.floor(Math.log10(lo)), b = Math.ceil(Math.log10(hi));
+    for (let k = a; k <= b; k++) for (const m of [1, 2, 5]) { const v = m * 10 ** k; if (v >= lo * 0.999 && v <= hi * 1.001) ticks.push(v); }
+    if (ticks.length > 7) ticks = ticks.filter((v) => /^1/.test(String(v / 10 ** Math.floor(Math.log10(v)))));
+    lo = Math.min(lo, ticks[0] || lo); hi = Math.max(hi, ticks[ticks.length - 1] || hi);
+  } else {
+    const step = niceStep((hi - lo) / 4); lo = Math.max(0, Math.floor(lo / step) * step); hi = Math.ceil(hi / step) * step;
+    for (let v = lo; v <= hi + step / 2; v += step) ticks.push(v);
+  }
+  const x = (t) => L + (Math.max(t, t0) - t0) / (t1 - t0 || 1) * (W - L - R);
+  const y = useLog ? (v) => T + (1 - (Math.log10(v) - Math.log10(lo)) / (Math.log10(hi) - Math.log10(lo) || 1)) * (H - T - B)
+                   : (v) => T + (1 - (v - lo) / (hi - lo)) * (H - T - B);
   let g = "";
-  for (let v = lo; v <= hi + step / 2; v += step) g += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${L - 8}" y="${y(v) + 4}" text-anchor="end" font-size="11" font-family="IBM Plex Mono, monospace" fill="var(--muted)">${money(it, v)}</text>`;
+  for (const v of ticks) g += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${L - 8}" y="${y(v) + 4}" text-anchor="end" font-size="11" font-family="IBM Plex Mono, monospace" fill="var(--muted)">${money(it, v)}</text>`;
   // time ticks
   const spanY = (t1 - t0) / (365.25 * DAY), y0 = new Date(t0).getUTCFullYear(), y1 = new Date(t1).getUTCFullYear();
   if (spanY > 2) { const every = Math.ceil((y1 - y0 + 1) / 8);
@@ -312,6 +326,7 @@ function bind() {
     const pr = e.target.closest("#period button"); if (pr) { period = +pr.dataset.d; setPressed("#period button", pr); renderMap(); renderMovers(); renderSummary(); renderDetail(); return; }
     const cm = e.target.closest("#costmode button"); if (cm) { costMode = cm.dataset.m; try { localStorage.setItem("pm-cost", costMode); } catch { /* ignore */ } setPressed("#costmode button", cm); applyCostMode(); renderSummary(); renderMovers(); renderFeed(); renderMap(); renderDetail(); return; }
     const dn = e.target.closest("#density button"); if (dn) { density = dn.dataset.v; setPressed("#density button", dn); renderMap(); return; }
+    const sc = e.target.closest("#scale button"); if (sc) { logScale = sc.dataset.s === "log"; setPressed("#scale button", sc); drawChart(); return; }
     const hr = e.target.closest("#range button"); if (hr) { histYears = +hr.dataset.y; setPressed("#range button", hr); renderDetail(); return; }
     if (!e.target.closest("#combo")) { $("results").hidden = true; $("combo").setAttribute("aria-expanded", "false"); }
   });

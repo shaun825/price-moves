@@ -9,11 +9,12 @@ SOURCES = [
     ("Stats SA via NAMC", "Statistics South Africa urban average retail prices, as published in the National Agricultural Marketing Council (NAMC) Food Price Monitor, Table 2 (2009-2016)"),
     ("Stats SA", "Statistics South Africa, Retail prices 1996 (P0141.3), average annual retail prices 1995 and 1996"),
     ("AC Nielsen via NAMC", "AC Nielsen national average retail prices, as published in NAMC Food Pricing Monitoring Committee report, Part 3, Table 3.1 (Jan 2000 and Oct 2003)"),
+    ("Stats SA yearbook", "Statistics South Africa, South African Statistics 2010, table 7.3.1 'Consumer prices: historical table, 1910-2008', retail prices of selected food items (annual, principal urban areas)"),
 ]
 S = {s[0]: i for i, s in enumerate(SOURCES)}
 series = {}
 def add(iid, date, v, src, label):
-    series.setdefault(iid, []).append([date, round(v, 2), S[src], label])
+    series.setdefault(iid, []).append([date, round(v, 4), S[src], label])
 
 # 1) NAMC Food Price Monitor tables (Stats SA urban averages), parsed from each issue's current month,
 #    with these hand-checked corrections from the original tables:
@@ -38,6 +39,16 @@ P1996 = {"GRO-111": (7.03, 7.56), "GRO-015": (5.73, 6.29), "GRO-057": (2.18, 2.3
 for iid, (a, b) in P1996.items():
     add(iid, "1995-07-01", a, "Stats SA", "1995 annual average, Stats SA Retail prices (P0141.3)")
     add(iid, "1996-07-01", b, "Stats SA", "1996 annual average, Stats SA Retail prices (P0141.3)")
+
+# 2b) Stats SA yearbook historical table (cents, annual): milk per litre and butter 500 g from 1910,
+#     white sugar 2.5 kg from 1976 (Stats SA footnote: factory-packed sugar as from 1976). Bread is excluded:
+#     the table's loaf is 900 g before July 1985 and 800 g after, not our 700 g loaf.
+tab = json.load(open("research/sastats_hist_table.json"))
+for iid, col, first in (("GRO-057", "milk", 1910), ("GRO-065", "butter", 1910), ("GRO-111", "sugar", 1976)):
+    for y, c in sorted(tab[col].items()):
+        if c is None or int(y) < first: continue
+        if iid in P1996 and y in ("1995", "1996"): continue  # same figures already added from P0141.3
+        add(iid, f"{y}-07-01", c / 100, "Stats SA yearbook", f"{y} annual average, Stats SA (South African Statistics, historical table)")
 
 # 3) AC Nielsen averages, Jan 2000 and Oct 2003 (generic items only; brand-specific and 'cheapest' lines excluded)
 ACN = {"GRO-001": (3.12, 3.95), "GRO-002": (2.56, 3.56), "GRO-060": (3.32, 5.88), "GRO-065": (10.71, 15.63),
