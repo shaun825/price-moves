@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en-ZA">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Price Moves</title>
+<meta name="description" content="What South Africans pay for food, fuel, cars and everyday services, checked every month and kept as history. Every price names its source.">
+<meta property="og:title" content="Price Moves">
+<meta property="og:description" content="South African prices, checked monthly and kept as history. Fuel prices back to 1976.">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#F5C518">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <h1>Price Moves</h1>
+      <p>What South Africans pay for food, fuel, cars and everyday services, checked every month and kept as history. Every price names where it came from.</p>
+    </div>
+    <div class="status">
+      <span class="asof" id="asof">Loading prices…</span>
+      <span id="countline" class="num"></span>
+      <a href="#about">How prices are collected</a>
+    </div>
+  </header>
+
+  <div class="searchbar" role="combobox" aria-expanded="false" aria-haspopup="listbox" id="combo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
+    <input id="q" type="search" autocomplete="off" placeholder="Search prices: bread, petrol 95, diesel, Polo Vivo…" aria-label="Search prices" aria-controls="results">
+    <kbd>/</kbd>
+    <div class="results" id="results" role="listbox" hidden></div>
+  </div>
+  <div class="chips" id="chips" aria-label="Filter by category"></div>
+  <div class="ctrl"><span class="lbl">Change over</span><div class="seg" id="period" role="group" aria-label="Period for price changes"><button data-d="30">1 month</button><button data-d="365" aria-pressed="true">12 months</button><button data-d="1826">5 years</button></div></div>
+
+  <section class="summary" aria-label="Headline numbers">
+    <div class="sum"><div class="lbl">Petrol 95, inland</div><div class="val num" id="s-fuel">–</div><div class="sub" id="s-fuel-sub"></div></div>
+    <div class="sum"><div class="lbl">Prices tracked</div><div class="val" id="s-items">–</div><div class="sub" id="s-items-sub"></div></div>
+    <div class="sum"><div class="lbl" id="s-up-lbl">Rising</div><div class="val u" id="s-up">–</div><div class="sub" id="s-up-sub">items more than 1% dearer</div></div>
+    <div class="sum"><div class="lbl" id="s-down-lbl">Falling</div><div class="val d" id="s-down">–</div><div class="sub" id="s-down-sub">items more than 1% cheaper</div></div>
+  </section>
+
+  <div class="movers">
+    <section class="panel" aria-label="Biggest falls"><div class="panel-head"><h2 class="d">Biggest falls</h2><span class="tagline" id="mv-per-d"></span></div><ol class="mlist" id="mv-down"></ol></section>
+    <section class="panel" aria-label="Biggest rises"><div class="panel-head"><h2 class="u">Biggest rises</h2><span class="tagline" id="mv-per-u"></span></div><ol class="mlist" id="mv-up"></ol></section>
+    <section class="panel feedp" aria-label="Latest prices"><div class="panel-head"><h2>Latest prices</h2><span class="tagline">Newest first</span></div><div class="feed"><ol id="feed"></ol></div></section>
+  </div>
+
+  <div class="board">
+    <section class="panel" aria-label="Price heat map">
+      <div class="panel-head">
+        <h2>Every price at a glance</h2>
+        <div class="seg" id="density" role="group" aria-label="Block style"><button data-v="lab" aria-pressed="true">Labelled</button><button data-v="compact">Compact</button></div>
+      </div>
+      <div class="map" id="map"><div class="loading">Loading prices…</div></div>
+      <div class="legend"><span>Cheaper</span><span class="bar"></span><span>Dearer</span><span id="legendTxt"></span><span class="sw" aria-hidden="true"></span><span>New: one check so far</span></div>
+      <div class="hoverline" id="hoverline">Choose any block to open its price history.</div>
+    </section>
+
+    <section class="panel" aria-label="Selected item" id="detail">
+      <div class="d-top">
+        <div style="min-width:0">
+          <div class="d-crumb" id="d-crumb"></div>
+          <h2 class="d-name" id="d-name"></h2>
+          <div class="d-spec" id="d-spec"></div>
+          <div class="delta" id="d-delta" hidden></div>
+        </div>
+        <div><div class="pricetag"><div class="p" id="d-price"></div><div class="per" id="d-per"></div></div><div class="credit" id="d-credit"></div></div>
+      </div>
+      <div class="panel-head" style="margin-top:18px;margin-bottom:0">
+        <h2 style="font-size:15px">Price history</h2>
+        <div class="seg" id="range" role="group" aria-label="History period">
+          <button data-y="1">1Y</button><button data-y="5" aria-pressed="true">5Y</button><button data-y="10">10Y</button><button data-y="0">All</button>
+        </div>
+      </div>
+      <div class="chartbox" id="chartbox"><svg id="chart" role="img" aria-label="Price history chart"></svg><div class="chart-tip" id="tip" hidden></div></div>
+      <div class="chartnote" id="chartnote"></div>
+      <div class="stats">
+        <div><small>Low</small><span id="st-lo"></span></div>
+        <div><small>High</small><span id="st-hi"></span></div>
+        <div><small>Checks</small><span id="st-n"></span></div>
+        <div><small>Last checked</small><span id="st-chk"></span></div>
+      </div>
+      <div class="sellers" id="sellers"></div>
+      <div class="meta" id="meta"></div>
+    </section>
+  </div>
+
+  <section class="about" id="about" aria-label="About these prices">
+    <div class="panel">
+      <div class="panel-head"><h2>How prices are collected</h2></div>
+      <h3>Once a month</h3>
+      <p>Each item has a fixed description, such as a 700 g white sliced loaf or a litre of inland 95 petrol, so prices compare like with like over time. Regulated fuel prices come from the official monthly tables. Other prices are found with an AI-assisted web search of public price listings and checked before they are published; prices the system is not confident about are held back until a person reviews them.</p>
+      <h3>Where each price comes from</h3>
+      <p>Every price shows the store, publisher or provider it came from and the date it was seen, for example “Checkers · 9 Nov 2026”. When several stores were checked, the headline is the middle (median) price and each store is listed.</p>
+      <h3>History</h3>
+      <p>Fuel prices run monthly from January 2012, with earlier inland petrol prices back to 1976 shown as individual data points. Other items build their history from the first check onwards.</p>
+      <h3>Not yet included</h3>
+      <p>Provincial comparisons will be added once enough prices have been collected in each province. Items appear only once they have a published price.</p>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h2>Sources and fine print</h2></div>
+      <h3>Credits</h3>
+      <ul>
+        <li>Fuel prices from 2012: Fuels Industry Association of South Africa, official regulated prices.</li>
+        <li>Inland petrol before 2012: Statistics South Africa, “A 50-year take on the petrol price”, based on Department of Mineral Resources and Energy data. The selection, charts and analysis here are Price Moves’ own and are not Stats SA’s.</li>
+        <li>Other prices: the retailers, manufacturers and publishers named beside each price.</li>
+      </ul>
+      <h3>Please note</h3>
+      <p>Prices are a guide only. They are what a public listing showed on the date given and may differ in store, by branch, by province or after promotions end. Price Moves is independent and is not affiliated with, or endorsed by, any retailer or brand named here. Names are used only to say where a price came from. Prices include VAT unless marked otherwise; petrol, diesel and paraffin are zero-rated.</p>
+      <p>No personal information is collected from the listings we check. This site does not use tracking cookies.</p>
+    </div>
+  </section>
+
+  <footer><span>© <span id="yr"></span> Price Moves · pricemoves.co.za</span><span id="gen"></span></footer>
+</div>
+<script src="/app.js" defer></script>
+</body>
+</html>
