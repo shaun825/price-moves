@@ -26,6 +26,11 @@ async function load() {
   for (const f of ["/data/fuel-history.json", "/data/statssa-history.json"]) {
     try { const h = await getJSON(f); h.short = h.short || ["Fuels Industry Association", "Stats SA"]; HIST.push(h); } catch { /* optional */ }
   }
+  // Stats SA official averages: items that have them use that series for price, change and chart, so months
+  // are always compared like with like; store checks are listed separately and drawn as dots
+  const OFF = HIST.find((h) => h.items) || { series: {}, items: {}, prov: {} };
+  const have = new Set(data.items.map((i) => i.id));
+  for (const [id, m] of Object.entries(OFF.items)) if (!have.has(id)) data.items.push({ id, ...m, prov: false, method: "", obs: [] });
   const F = data.fields || ["date", "price", "source", "province", "city", "packSeen", "vat", "promotion"];
   const ix = Object.fromEntries(F.map((f, i) => [f, i]));
 
@@ -42,6 +47,9 @@ async function load() {
       const t = Math.max(...list.map((o) => o.t)), srcs = [...new Set(list.map((o) => o.src))];
       pts.set(k, { t, v: median(list.map((o) => o.v)), src: srcs.length === 1 ? srcs[0] : `median of ${srcs.length} sources`, n: list.length, anchor: false });
     }
+    const official = !!OFF.series[it.id];
+    const store = official ? [...pts.values()].sort((a, b) => a.t - b.t) : [];
+    if (official) pts.clear();
     // long history (fuel); our own observation wins for any month both cover
     for (const hist of HIST) for (const [ds, v, si, label] of hist.series[it.id] || []) {
       const t = parseDate(ds), d = new Date(t), k = d.getUTCFullYear() * 12 + d.getUTCMonth();
@@ -50,7 +58,7 @@ async function load() {
     const series = [...pts.values()].sort((a, b) => a.t - b.t);
     const lastT = series.length ? series[series.length - 1].t : 0;
     if (lastT > LATEST) LATEST = lastT;
-    return { ...it, obsList: obs.sort((a, b) => b.t - a.t), series, lastT };
+    return { ...it, obsList: obs.sort((a, b) => b.t - a.t), series, lastT, official, store, provData: OFF.prov[it.id] || null, statssa: OFF.items[it.id]?.statssa || "" };
   }).filter((it) => it.series.length);
   BYID = Object.fromEntries(ITEMS.map((i) => [i.id, i]));
   CATS = [...new Set(ITEMS.map((i) => i.cat))];
@@ -166,28 +174,40 @@ function renderDetail() {
   $("d-spec").textContent = it.spec + (it.tier ? ` · ${it.tier}` : "");
   $("d-price").innerHTML = priceParts(it, last.v);
   $("d-per").textContent = it.unit || it.spec;
-  const latestObs = it.obsList.filter((o) => o.t >= last.t - 31 * DAY);
+  const latestObs = it.obsList.length ? it.obsList.filter((o) => o.t >= it.obsList[0].t - 31 * DAY) : [];
   const vatTxt = latestObs.length && /excl/i.test(latestObs[0].vat) ? " · excl. VAT" : "";
-  $("d-credit").textContent = (latestObs.length > 1 && new Set(latestObs.map((o) => o.src)).size > 1 ? `Median of ${new Set(latestObs.map((o) => o.src)).size} sources · ${fmtMonth(last.t)}` : `${last.src} · ${fmtDate(last.t)}`) + vatTxt;
+  $("d-credit").textContent = it.official ? `Stats SA average · ${fmtMonth(last.t)}` : (latestObs.length > 1 && new Set(latestObs.map((o) => o.src)).size > 1 ? `Median of ${new Set(latestObs.map((o) => o.src)).size} sources · ${fmtMonth(last.t)}` : `${last.src} · ${fmtDate(last.t)}`) + vatTxt;
   const c = change(it, period), dl = $("d-delta");
   dl.hidden = false; dl.className = "delta " + cls(c);
   dl.textContent = c == null ? (it.series.length < 2 ? "New · first check" : `No price ${perLbl()} earlier`) : `${c > 0 ? "▲" : c < 0 ? "▼" : "■"} ${pct(c)} over ${perLbl()}`;
   const win = visible(it), vals = win.map((p) => p.v);
   $("st-lo").textContent = money(it, Math.min(...vals)); $("st-hi").textContent = money(it, Math.max(...vals));
-  $("st-n").textContent = it.series.length; $("st-chk").textContent = fmtDate(it.lastT);
+  $("st-n").textContent = it.series.length + (it.official ? " months" : ""); $("st-chk").textContent = it.official ? fmtMonth(it.lastT) : fmtDate(it.lastT);
   drawChart();
   // by source: most recent check per source within the latest month
   const bySrc = new Map(); for (const o of latestObs) if (!bySrc.has(o.src + o.prov)) bySrc.set(o.src + o.prov, o);
   const rows = [...bySrc.values()].sort((a, b) => a.v - b.v);
   if (rows.length > 1) {
     const mx = rows[rows.length - 1].v, mn = rows[0].v;
-    $("sellers").innerHTML = `<h3>Latest check by source</h3>` + rows.map((o, k) => `<div class="srow${k === 0 && mx > mn ? " best" : ""}"><span class="nm" title="${esc(o.src)}">${esc(o.src)} <small>${esc(fmtDate(o.t).replace(/ \d{4}$/, ""))}${o.prov !== "National" ? " · " + esc(o.prov) : ""}${o.promo ? " · promo" : ""}</small></span><span class="bar" style="width:${(40 + 60 * (o.v - mn * 0.9) / ((mx - mn * 0.9) || 1)).toFixed(1)}%"></span><span class="v">${money(it, o.v)}</span></div>`).join("");
+    $("sellers").innerHTML = `<h3>${it.official ? "Latest store prices" : "Latest check by source"}</h3>` + rows.map((o, k) => `<div class="srow${k === 0 && mx > mn ? " best" : ""}"><span class="nm" title="${esc(o.src)}">${esc(o.src)} <small>${esc(fmtDate(o.t).replace(/ \d{4}$/, ""))}${o.prov !== "National" ? " · " + esc(o.prov) : ""}${o.promo ? " · promo" : ""}</small></span><span class="bar" style="width:${(40 + 60 * (o.v - mn * 0.9) / ((mx - mn * 0.9) || 1)).toFixed(1)}%"></span><span class="v">${money(it, o.v)}</span></div>`).join("");
   } else if (rows.length === 1) {
     const o = rows[0];
-    $("sellers").innerHTML = `<h3>Source</h3><div style="font-size:13px">${esc(o.src)} · ${esc(fmtDate(o.t))}${o.city ? " · " + esc(o.city) : ""}${o.pack ? ` · pack seen: ${esc(o.pack)}` : ""}${o.promo ? " · on promotion" : ""}</div>`;
-  } else $("sellers").innerHTML = `<h3>Source</h3><div style="font-size:13px">${esc(last.src)} · ${esc(fmtDate(last.t))}</div>`;
-  $("meta").innerHTML = `<div><small>Checked</small>Monthly${it.method ? " · " + esc(it.method) : ""}</div><div><small>Comparable unit</small>${esc(it.unit || "–")}</div>`;
+    $("sellers").innerHTML = `<h3>${it.official ? "Latest store price" : "Source"}</h3><div style="font-size:13px">${it.official ? money(it, o.v) + " · " : ""}${esc(o.src)} · ${esc(fmtDate(o.t))}${o.city ? " · " + esc(o.city) : ""}${o.pack ? ` · pack seen: ${esc(o.pack)}` : ""}${o.promo ? " · on promotion" : ""}</div>`;
+  } else $("sellers").innerHTML = it.official ? "" : `<h3>Source</h3><div style="font-size:13px">${esc(last.src)} · ${esc(fmtDate(last.t))}</div>`;
+  renderProvinces(it);
+  $("meta").innerHTML = `<div><small>Checked</small>Monthly${it.method ? " · " + esc(it.method) : ""}</div><div><small>Comparable unit</small>${esc(it.unit || "–")}</div>` +
+    (it.official ? `<div style="grid-column:1/-1"><small>Price history</small>Stats SA average shelf price for “${esc(it.statssa)}”, all urban areas. The headline price, changes and chart use this average; dots on the chart are our own store checks.</div>` : "");
   paintTiles();
+}
+const PNAMES = { GP: "Gauteng", WC: "Western Cape", KZN: "KwaZulu-Natal", EC: "Eastern Cape", FS: "Free State", LP: "Limpopo", MP: "Mpumalanga", NW: "North West", NC: "Northern Cape" };
+function renderProvinces(it) {
+  const el = $("provs"); if (!el) return;
+  if (!it.provData) { el.innerHTML = ""; return; }
+  const rows = Object.entries(it.provData).map(([c, [v, a]]) => [c, v, a ? v / a - 1 : null]).sort((x, y) => x[1] - y[1]);
+  const mx = Math.max(...rows.map((r) => r[1])), mn = Math.min(...rows.map((r) => r[1]));
+  el.innerHTML = `<h3>By province · Stats SA, ${esc(fmtMonth(it.lastT))}</h3>` + rows.map(([c, v, ch], k) =>
+    `<div class="srow${k === 0 && mx > mn ? " best" : ""}"><span class="nm">${esc(PNAMES[c] || c)} <small class="${cls(ch)}">${ch == null ? "" : pct(ch) + " y/y"}</small></span><span class="bar" style="width:${(40 + 60 * (v - mn * 0.9) / ((mx - mn * 0.9) || 1)).toFixed(1)}%"></span><span class="v">${money(it, v)}</span></div>`).join("") +
+    `<div class="chartnote">Cheapest to dearest. Gap between dearest and cheapest province: ${pct(mx / mn - 1).replace("+", "")}.</div>`;
 }
 function visible(it) {
   const s = it.series; if (!histYears) return s;
@@ -232,6 +252,7 @@ function drawChart() {
   g += `<path d="${dashed}" fill="none" stroke="${col}" stroke-width="1.4" stroke-dasharray="4 4" opacity=".7"/><path d="${solid}" fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round"/>`;
   for (const p of pts) if (p.anchor) g += `<circle cx="${x(p.t)}" cy="${y(p.v)}" r="3" fill="var(--surface)" stroke="${col}" stroke-width="1.5"/>`;
   g += `<circle cx="${x(lastP.t)}" cy="${y(lastP.v)}" r="4.5" fill="${col}" stroke="var(--surface)" stroke-width="2"/>`;
+  for (const p of it.store || []) if (p.t >= t0 && p.v >= lo && p.v <= hi) g += `<circle cx="${x(p.t)}" cy="${y(p.v)}" r="3.5" fill="var(--tag)" stroke="var(--ink)" stroke-width="1"><title>Store check ${esc(fmtDate(p.t))}: ${money(it, p.v)} (${esc(p.src)})</title></circle>`;
   g += `<g id="cross" visibility="hidden"><line id="cx" y1="${T}" y2="${H - B}" stroke="var(--muted)" stroke-dasharray="3 3"/><circle id="cd" r="4" fill="var(--ink)"/></g>`;
   svg.innerHTML = g;
   geom = { x, y, pts, W };
