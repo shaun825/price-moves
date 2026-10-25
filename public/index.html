@@ -36,13 +36,13 @@
     <div class="results" id="results" role="listbox" hidden></div>
   </div>
   <div class="chips" id="chips" aria-label="Filter by category"></div>
-  <div class="ctrl"><span class="lbl">Change over</span><div class="seg" id="period" role="group" aria-label="Period for price changes"><button data-d="30">1 month</button><button data-d="365" aria-pressed="true">12 months</button><button data-d="1826">5 years</button></div></div>
+  <div class="ctrl"><span class="lbl">Change over</span><div class="seg" id="period" role="group" aria-label="Period for price changes"><button data-d="30">1 month</button><button data-d="365" aria-pressed="true">12 months</button><button data-d="730">2 years</button><button data-d="1096">3 years</button><button data-d="1461">4 years</button><button data-d="1826">5 years</button><button data-d="3652">10 years</button><button data-d="5479">15 years</button><button data-d="7305">20 years</button><button data-d="10958">30 years</button><button data-d="18262">50 years</button></div></div>
 
   <section class="summary" aria-label="Headline numbers">
     <div class="sum"><div class="lbl">Petrol 95, inland</div><div class="val num" id="s-fuel">–</div><div class="sub" id="s-fuel-sub"></div></div>
     <div class="sum"><div class="lbl">Prices tracked</div><div class="val" id="s-items">–</div><div class="sub" id="s-items-sub"></div></div>
-    <div class="sum"><div class="lbl" id="s-up-lbl">Rising</div><div class="val u" id="s-up">–</div><div class="sub" id="s-up-sub">items more than 1% dearer</div></div>
-    <div class="sum"><div class="lbl" id="s-down-lbl">Falling</div><div class="val d" id="s-down">–</div><div class="sub" id="s-down-sub">items more than 1% cheaper</div></div>
+    <div class="sum"><div class="lbl" id="s-up-lbl">Higher</div><div class="val u" id="s-up">–</div><div class="sub" id="s-up-sub">items more than 1% higher</div></div>
+    <div class="sum"><div class="lbl" id="s-down-lbl">Lower</div><div class="val d" id="s-down">–</div><div class="sub" id="s-down-sub">items more than 1% lower</div></div>
   </section>
 
   <div class="movers">
@@ -58,7 +58,7 @@
         <div class="seg" id="density" role="group" aria-label="Block style"><button data-v="lab" aria-pressed="true">Labelled</button><button data-v="compact">Compact</button></div>
       </div>
       <div class="map" id="map"><div class="loading">Loading prices…</div></div>
-      <div class="legend"><span>Cheaper</span><span class="bar"></span><span>Dearer</span><span id="legendTxt"></span><span class="sw" aria-hidden="true"></span><span>New: one check so far</span></div>
+      <div class="legend"><span>Lower</span><span class="bar"></span><span>Higher</span><span id="legendTxt"></span><span class="sw" aria-hidden="true"></span><span>New: one check so far</span></div>
       <div class="hoverline" id="hoverline">Choose any block to open its price history.</div>
     </section>
 

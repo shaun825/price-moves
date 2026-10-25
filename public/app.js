@@ -74,7 +74,7 @@ function change(it, days) {
   const target = s[s.length - 1].t - days * DAY + 12 * DAY; // allow a check a few days late
   let j = -1; for (let k = s.length - 2; k >= 0; k--) if (s[k].t <= target) { j = k; break; }
   if (j < 0) return null;
-  if (s[s.length - 1].t - s[j].t > days * DAY * 1.6 + 20 * DAY) return null; // gap too wide to call it this period
+  if (target - s[j].t > Math.max(45, days * 0.1) * DAY) return null; // no price close enough to the start of the period
   return s[s.length - 1].v / s[j].v - 1;
 }
 function money(it, v) {
@@ -85,7 +85,7 @@ function money(it, v) {
 }
 const pct = (x) => (x >= 0 ? "+" : "−") + Math.abs(x * 100).toFixed(1) + "%";
 const cls = (x) => (x == null ? "f" : x > 0.001 ? "u" : x < -0.001 ? "d" : "f");
-const perLbl = () => ({ 30: "1 month", 365: "12 months", 1826: "5 years" })[period];
+const perLbl = () => period === 30 ? "1 month" : period === 365 ? "12 months" : `${Math.round(period / 365.25)} years`;
 
 /* chips */
 function renderChips() {
@@ -136,7 +136,7 @@ function paintTiles() {
 function renderMovers() {
   const pool = ITEMS.filter((i) => i.cat !== "Macro & markets").map((i) => [i, change(i, period)]).filter((x) => x[1] != null);
   const row = ([i, c], k) => `<li><button class="mrow" data-id="${esc(i.id)}"><span class="rk">${k + 1}</span><span class="nm"><span>${esc(i.name)}</span><small>${esc(i.spec)} · ${esc(i.cat)}</small></span><span class="pr">${money(i, cur(i))}</span><span class="pc ${cls(c)}">${pct(c)}</span></button></li>`;
-  const none = (w) => `<li class="empty">No ${w} over ${perLbl()} yet. Moves appear once an item has been checked in two different months.</li>`;
+  const none = (w) => `<li class="empty">${period > 731 ? `No prices on the site go back ${perLbl()} yet, apart from the ones shown.` : `No ${w} over ${perLbl()} yet. Moves appear once an item has prices from two different months.`}</li>`;
   const dn = pool.filter((x) => x[1] < -0.0005).sort((a, b) => a[1] - b[1]).slice(0, 10);
   const up = pool.filter((x) => x[1] > 0.0005).sort((a, b) => b[1] - a[1]).slice(0, 10);
   $("mv-down").innerHTML = dn.length ? dn.map(row).join("") : none("falls");
@@ -149,9 +149,9 @@ function renderSummary() {
   const srcs = new Set(ITEMS.flatMap((i) => i.obsList.map((o) => o.src)));
   $("s-items").textContent = ITEMS.length; $("s-items-sub").textContent = `${CATS.length} categories · ${srcs.size} named sources`;
   const m = ITEMS.filter((i) => i.cat !== "Macro & markets").map((i) => change(i, period)).filter((x) => x != null);
-  $("s-up-lbl").textContent = `Rising, ${perLbl()}`; $("s-down-lbl").textContent = `Falling, ${perLbl()}`;
+  $("s-up-lbl").textContent = `Higher, ${perLbl()}`; $("s-down-lbl").textContent = `Lower, ${perLbl()}`;
   $("s-up").textContent = m.filter((x) => x > 0.01).length; $("s-down").textContent = m.filter((x) => x < -0.01).length;
-  $("s-up-sub").textContent = `of ${m.length} with history, more than 1% dearer`; $("s-down-sub").textContent = `of ${m.length} with history, more than 1% cheaper`;
+  $("s-up-sub").textContent = `of ${m.length} with history, more than 1% higher`; $("s-down-sub").textContent = `of ${m.length} with history, more than 1% lower`;
   $("asof").textContent = LATEST ? "Prices to " + fmtDate(LATEST) : "No prices yet";
   $("countline").textContent = `${ITEMS.length} prices · checked monthly`;
 }
@@ -207,7 +207,7 @@ function renderProvinces(it) {
   const mx = Math.max(...rows.map((r) => r[1])), mn = Math.min(...rows.map((r) => r[1]));
   el.innerHTML = `<h3>By province · Stats SA, ${esc(fmtMonth(it.lastT))}</h3>` + rows.map(([c, v, ch], k) =>
     `<div class="srow${k === 0 && mx > mn ? " best" : ""}"><span class="nm">${esc(PNAMES[c] || c)} <small class="${cls(ch)}">${ch == null ? "" : pct(ch) + " y/y"}</small></span><span class="bar" style="width:${(40 + 60 * (v - mn * 0.9) / ((mx - mn * 0.9) || 1)).toFixed(1)}%"></span><span class="v">${money(it, v)}</span></div>`).join("") +
-    `<div class="chartnote">Cheapest to dearest. Gap between dearest and cheapest province: ${pct(mx / mn - 1).replace("+", "")}.</div>`;
+    `<div class="chartnote">Lowest to highest. Gap between the highest and lowest province: ${pct(mx / mn - 1).replace("+", "")}.</div>`;
 }
 function visible(it) {
   const s = it.series; if (!histYears) return s;
