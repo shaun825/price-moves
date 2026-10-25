@@ -58,7 +58,10 @@ async function load() {
     const series = [...pts.values()].sort((a, b) => a.t - b.t);
     const lastT = series.length ? series[series.length - 1].t : 0;
     if (lastT > LATEST) LATEST = lastT;
-    return { ...it, obsList: obs.sort((a, b) => b.t - a.t), series, lastT, official, store, provData: OFF.prov[it.id] || null, statssa: OFF.items[it.id]?.statssa || "" };
+    // fees charged once a year are shown as a monthly amount (annual fee ÷ 12) so they sit alongside monthly costs
+    const annual = /^per (year|annum)$/i.test(it.unit || "");
+    if (annual) { for (const p of series) p.v /= 12; for (const o of obs) o.v /= 12; for (const p of store) p.v /= 12; }
+    return { ...it, unit: annual ? "per month" : it.unit, annual, obsList: obs.sort((a, b) => b.t - a.t), series, lastT, official, store, provData: OFF.prov[it.id] || null, statssa: OFF.items[it.id]?.statssa || "" };
   }).filter((it) => it.series.length);
   BYID = Object.fromEntries(ITEMS.map((i) => [i.id, i]));
   CATS = [...new Set(ITEMS.map((i) => i.cat))];
@@ -173,7 +176,7 @@ function renderDetail() {
   $("d-name").textContent = it.name;
   $("d-spec").textContent = it.spec + (it.tier ? ` · ${it.tier}` : "");
   $("d-price").innerHTML = priceParts(it, last.v);
-  $("d-per").textContent = it.unit || it.spec;
+  $("d-per").textContent = it.annual ? `per month · ${money(it, last.v * 12)} a year` : (it.unit || it.spec);
   const latestObs = it.obsList.length ? it.obsList.filter((o) => o.t >= it.obsList[0].t - 31 * DAY) : [];
   const vatTxt = latestObs.length && /excl/i.test(latestObs[0].vat) ? " · excl. VAT" : "";
   $("d-credit").textContent = it.official ? `Stats SA average · ${fmtMonth(last.t)}` : (latestObs.length > 1 && new Set(latestObs.map((o) => o.src)).size > 1 ? `Median of ${new Set(latestObs.map((o) => o.src)).size} sources · ${fmtMonth(last.t)}` : `${last.src} · ${fmtDate(last.t)}`) + vatTxt;
@@ -196,6 +199,7 @@ function renderDetail() {
   } else $("sellers").innerHTML = it.official ? "" : `<h3>Source</h3><div style="font-size:13px">${esc(last.src)} · ${esc(fmtDate(last.t))}</div>`;
   renderProvinces(it);
   $("meta").innerHTML = `<div><small>Checked</small>Monthly${it.method ? " · " + esc(it.method) : ""}</div><div><small>Comparable unit</small>${esc(it.unit || "–")}</div>` +
+    (it.annual ? `<div style="grid-column:1/-1"><small>Annual fee</small>Charged once a year at ${money(it, it.series[it.series.length - 1].v * 12)}. Shown here as a monthly amount (the annual fee divided by 12) so it compares with other monthly costs.</div>` : "") +
     (it.official ? `<div style="grid-column:1/-1"><small>Price history</small>Stats SA average shelf price for “${esc(it.statssa)}”, all urban areas. The headline price, changes and chart use this average; dots on the chart are our own store checks.</div>` : "");
   paintTiles();
 }
