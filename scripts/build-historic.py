@@ -8,7 +8,7 @@ import json
 SOURCES = [
     ("Stats SA via NAMC", "Statistics South Africa urban average retail prices, as published in the National Agricultural Marketing Council (NAMC) Food Price Monitor, Table 2 (2009-2016)"),
     ("Stats SA", "Statistics South Africa, Retail prices 1996 (P0141.3), average annual retail prices 1995 and 1996"),
-    ("AC Nielsen via NAMC", "AC Nielsen national average retail prices, as published in NAMC Food Pricing Monitoring Committee report, Part 3, Table 3.1 (Jan 2000 and Oct 2003)"),
+    ("AC Nielsen via NAMC", "AC Nielsen national (urban) average retail prices, as published by the NAMC: Food Pricing Monitoring Committee report 2004, Table 3.1 (Jan 2000, Oct 2003), and NAMC Food Price Trends / Food Price Monitoring releases 2005-2008"),
     ("Stats SA yearbook", "Statistics South Africa, South African Statistics 2010, table 7.3.1 'Consumer prices: historical table, 1910-2008', retail prices of selected food items (annual, principal urban areas)"),
 ]
 S = {s[0]: i for i, s in enumerate(SOURCES)}
@@ -57,6 +57,13 @@ ACN = {"GRO-001": (3.12, 3.95), "GRO-002": (2.56, 3.56), "GRO-060": (3.32, 5.88)
 for iid, (a, b) in ACN.items():
     add(iid, "2000-01-15", a, "AC Nielsen via NAMC", "Jan 2000, AC Nielsen national average (NAMC)")
     add(iid, "2003-10-15", b, "AC Nielsen via NAMC", "Oct 2003, AC Nielsen national average (NAMC)")
+
+# 4) NAMC Food Price Trends / Monitoring releases 2005-2008 (AC Nielsen urban averages). Only months where the
+#    releases agree are kept (research/namc_2005_2008.json lists the release files behind each figure).
+for iid, months in json.load(open("research/namc_2005_2008.json")).items():
+    for ym, (v, files) in sorted(months.items()):
+        y, m = ym.split("-")
+        add(iid, f"{ym}-15", v, "AC Nielsen via NAMC", f"{MONTHS[int(m)-1]} {y}, AC Nielsen national average (NAMC Food Price Trends)")
 
 for s in series.values(): s.sort()
 out = {"note": "Actual published average prices before 2017. Each point names its source; no estimates.",
