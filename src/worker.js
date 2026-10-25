@@ -20,7 +20,9 @@ const O = {
   promo: "fld6RBJO9YLr92A7N", confidence: "fldtItLDOEHgRh9M0", publish: "fld0NvwNlwYGSr6i1",
 };
 
-const CACHE_SECONDS = 6 * 60 * 60;
+const CACHE_SECONDS = 6 * 60 * 60;   // how long the edge keeps a copy
+const BROWSER_SECONDS = 5 * 60;      // how long a visitor's browser keeps a copy
+const CACHE_VERSION = "2";           // bump to clear the edge copy on the next deploy
 
 export default {
   async fetch(request, env, ctx) {
@@ -32,9 +34,9 @@ export default {
 
 async function prices(request, env, ctx) {
   const cache = caches.default;
-  const key = new Request(new URL("/api/prices", request.url).toString(), { method: "GET" });
+  const key = new Request(new URL(`/api/prices?cache=${CACHE_VERSION}`, request.url).toString(), { method: "GET" });
   const hit = await cache.match(key);
-  if (hit) return hit;
+  if (hit) return forBrowser(hit);
   try {
     const data = await build(env);
     const res = new Response(JSON.stringify(data), {
@@ -44,13 +46,19 @@ async function prices(request, env, ctx) {
       },
     });
     ctx.waitUntil(cache.put(key, res.clone()));
-    return res;
+    return forBrowser(res);
   } catch (err) {
     return new Response(JSON.stringify({ error: "Prices are temporarily unavailable." }), {
       status: 503,
       headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
     });
   }
+}
+
+function forBrowser(res) {
+  const out = new Response(res.body, res);
+  out.headers.set("cache-control", `public, max-age=${BROWSER_SECONDS}`);
+  return out;
 }
 
 async function list(env, table, fields, formula) {
